@@ -14,7 +14,10 @@ class Appointment extends Model
         'doctor_id',
         'appointment_date',
         'status',
-        'notes'
+        'notes',
+        'discount',
+        'final_amount',
+        'doctor_remarks'
     ];
 
     public function patient()
@@ -30,5 +33,13 @@ class Appointment extends Model
     public function queueTicket()
     {
         return $this->hasOne(QueueTicket::class);
+    }
+    
+    // Helper to calculate final amount
+    public function calculateFinalAmount()
+    {
+        $fee = $this->doctor->doctorProfile->fee ?? 0;
+        $this->final_amount = $fee - $this->discount;
+        $this->save();
     }
 }

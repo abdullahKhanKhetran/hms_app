@@ -99,18 +99,26 @@ class PatientController extends Controller
     /**
      * Download appointment slip (PDF)
      */
-    public function downloadSlip($id)
-    {
-        $appointment = Appointment::with(['doctor.doctorProfile', 'patient'])
-            ->findOrFail($id);
+   public function downloadSlip($id)
+{
+    $appointment = Appointment::with(['doctor.doctorProfile', 'patient', 'queueTicket'])
+        ->findOrFail($id);
 
-        // Security check
-        if ($appointment->patient_id !== Auth::id()) {
-            abort(403);
-        }
-
-        $pdf = Pdf::loadView('pdf.slip', compact('appointment'));
-
-        return $pdf->download('appointment-slip-' . $id . '.pdf');
+    if ($appointment->patient_id !== Auth::id()) {
+        abort(403);
     }
+
+    // Get patient's past completed appointments (last 5)
+    $pastAppointments = Appointment::where('patient_id', Auth::id())
+        ->where('status', 'completed')
+        ->where('id', '!=', $id)
+        ->with(['doctor.doctorProfile'])
+        ->orderBy('appointment_date', 'desc')
+        ->take(5)
+        ->get();
+
+    $pdf = Pdf::loadView('pdf.slip', compact('appointment', 'pastAppointments'));
+
+    return $pdf->download('appointment-slip-' . $id . '.pdf');
+}
 }
