@@ -39,6 +39,10 @@
             <td>Dr. {{ $appointment->doctor->name }}</td>
         </tr>
         <tr>
+            <th>Doctor Fee:</th>
+            <td>Rs. {{ $appointment->doctor->doctorProfile->fee ?? 'N/A' }}</td>
+        </tr>
+        <tr>
             <th>Department:</th>
             <td>{{ $appointment->doctor->doctorProfile->specialization ?? 'General' }}</td>
         </tr>
@@ -50,13 +54,12 @@
             <th>Time Slot:</th>
             <td>{{ $appointment->doctor->doctorProfile->start_time }} - {{ $appointment->doctor->doctorProfile->end_time }}</td>
         </tr>
-
         <tr>
-    <th>Token Number:</th>
-    <td style="font-size: 18px; font-weight: bold;">
-        {{ $appointment->queueTicket ? str_pad($appointment->queueTicket->token_number, 3, '0', STR_PAD_LEFT) : 'Pending' }}
-    </td>
-</tr>
+            <th>Token Number:</th>
+            <td style="font-size: 18px; font-weight: bold;">
+                {{ $appointment->queueTicket ? str_pad($appointment->queueTicket->token_number, 3, '0', STR_PAD_LEFT) : 'Pending' }}
+            </td>
+        </tr>
     </table>
 
     <div class="footer">

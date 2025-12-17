@@ -20,6 +20,7 @@ return new class extends Migration
         $table->time('end_time');   // Shift end
         $table->boolean('is_available')->default(true);
         $table->timestamps();
+         $table->integer('fee')->after('specialization');
     });
 }
 

@@ -9,13 +9,14 @@ class DoctorProfile extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'specialization',
-        'qualification',
-        'start_time',
-        'end_time',
-        'is_available'
-    ];
+    'user_id',
+    'specialization',
+    'qualification',
+    'start_time',
+    'end_time',
+    'fee', // add this
+];
+
 
     public function user()
     {

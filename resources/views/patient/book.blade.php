@@ -17,9 +17,10 @@
                         <select name="doctor_id" class="form-select form-select-lg" required>
                             <option value="">Choose a specialist...</option>
                             @foreach($doctors as $doc)
-                                <option value="{{ $doc->user_id }}">
-                                    Dr. {{ $doc->user->name }} ({{ $doc->specialization }})
-                                    [{{ $doc->start_time }} - {{ $doc->end_time }}]
+                                <option value="{{ $doc->id }}">
+                                    Dr. {{ $doc->name }}
+                                    ({{ $doc->doctorProfile->specialization }})
+                                    [{{ $doc->doctorProfile->start_time }} - {{ $doc->doctorProfile->end_time }}]
                                 </option>
                             @endforeach
                         </select>

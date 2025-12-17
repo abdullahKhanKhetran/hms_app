@@ -29,12 +29,14 @@ class AdminController extends Controller
     public function storeDoctor(Request $request)
     {
         $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'specialization' => 'required',
+            'specialization' => 'required|string',
+            'qualification' => 'required|string',
             'start_time' => 'required',
             'end_time' => 'required',
+            'fee' => 'required|numeric|min:0',
         ]);
 
         // Use Transaction to ensure both User and Profile are created, or neither
@@ -49,12 +51,14 @@ class AdminController extends Controller
 
             // 2. Create Profile
             DoctorProfile::create([
-                'user_id' => $user->id,
-                'specialization' => $request->specialization,
-                'qualification' => $request->qualification,
-                'start_time' => $request->start_time,
-                'end_time' => $request->end_time,
+                        'user_id' => $user->id,
+            'specialization' => $request->specialization,
+            'qualification' => $request->qualification,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'fee' => $request->fee, // now this will exist
             ]);
+
         });
 
         return redirect()->route('admin.dashboard')->with('success', 'Doctor added successfully!');

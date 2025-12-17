@@ -47,7 +47,10 @@
                             <input type="time" name="end_time" class="form-control" required>
                         </div>
                     </div>
-
+                    <div class="form-group">
+                        <label for="fee">Doctor Fee (Rs)</label>
+                        <input type="number" name="fee" id="fee" class="form-control" value="0" required>
+                    </div>
                     <button type="submit" class="btn btn-primary">Create Doctor</button>
                     <a href="{{ route('admin.dashboard') }}" class="btn btn-secondary">Cancel</a>
                 </form>

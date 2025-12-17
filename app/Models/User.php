@@ -31,11 +31,17 @@ class User extends Authenticatable
     // Relationships
     public function doctorProfile()
     {
-        return $this->hasOne(DoctorProfile::class);
+        return $this->hasOne(DoctorProfile::class,'user_id');
     }
 
     public function appointments()
     {
         return $this->hasMany(Appointment::class, 'patient_id');
     }
+
+    public function doctorAppointments()
+{
+    return $this->hasMany(Appointment::class, 'doctor_id');
+}
+
 }
