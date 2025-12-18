@@ -48,86 +48,27 @@
                                     </td>
                                     <td>
                                         @if($apt->status == 'pending')
-                                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal{{ $apt->id }}">
+                                            <button class="btn btn-sm btn-success approve-btn" 
+                                                    data-id="{{ $apt->id }}" 
+                                                    data-fee="{{ $apt->doctor->doctorProfile->fee ?? 0 }}">
                                                 <i class="fas fa-check"></i> Approve
                                             </button>
                                             
                                             <form action="{{ route('doctor.update_status', $apt->id) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="status" value="cancelled">
-                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                <button type="submit" class="btn btn-sm btn-danger" 
+                                                        onclick="return confirm('Are you sure you want to cancel this appointment?')">
                                                     <i class="fas fa-times"></i> Cancel
                                                 </button>
                                             </form>
 
-                                            <!-- Approve Modal -->
-                                            <div class="modal fade" id="approveModal{{ $apt->id }}" tabindex="-1">
-                                                <div class="modal-dialog">
-                                                    <div class="modal-content">
-                                                        <form action="{{ route('doctor.update_status', $apt->id) }}" method="POST">
-                                                            @csrf
-                                                            <div class="modal-header">
-                                                                <h5 class="modal-title">Approve Appointment</h5>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                            </div>
-                                                            <div class="modal-body">
-                                                                <input type="hidden" name="status" value="approved">
-                                                                
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Doctor Fee</label>
-                                                                    <input type="text" class="form-control" value="Rs. {{ $apt->doctor->doctorProfile->fee ?? 0 }}" readonly>
-                                                                </div>
-
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Discount (Rs)</label>
-                                                                    <input type="number" name="discount" class="form-control" value="0" min="0" step="0.01">
-                                                                </div>
-
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Remarks/Notes</label>
-                                                                    <textarea name="doctor_remarks" class="form-control" rows="3" placeholder="Add prescription or diagnosis notes..."></textarea>
-                                                                </div>
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-success">Approve & Save</button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
-
                                         @elseif($apt->status == 'approved')
-                                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#completeModal{{ $apt->id }}">
+                                            <button class="btn btn-sm btn-primary complete-btn" 
+                                                    data-id="{{ $apt->id }}"
+                                                    data-remarks="{{ $apt->doctor_remarks }}">
                                                 <i class="fas fa-clipboard-check"></i> Complete
                                             </button>
-
-                                            <!-- Complete Modal -->
-                                            <div class="modal fade" id="completeModal{{ $apt->id }}" tabindex="-1">
-                                                <div class="modal-dialog">
-                                                    <div class="modal-content">
-                                                        <form action="{{ route('doctor.update_status', $apt->id) }}" method="POST">
-                                                            @csrf
-                                                            <div class="modal-header">
-                                                                <h5 class="modal-title">Complete Appointment</h5>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                            </div>
-                                                            <div class="modal-body">
-                                                                <input type="hidden" name="status" value="completed">
-                                                                
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Final Remarks</label>
-                                                                    <textarea name="doctor_remarks" class="form-control" rows="3" placeholder="Add final diagnosis or prescription...">{{ $apt->doctor_remarks }}</textarea>
-                                                                </div>
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-primary">Mark as Completed</button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
@@ -145,4 +86,110 @@
         </div>
     </div>
 </div>
+
+<!-- SINGLE APPROVE MODAL (OUTSIDE THE TABLE) -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="approveForm" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Approve Appointment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="status" value="approved">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Doctor Fee</label>
+                        <input type="text" id="feeDisplay" class="form-control" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Discount (Rs)</label>
+                        <input type="number" name="discount" class="form-control" value="0" min="0" step="0.01">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Remarks/Notes</label>
+                        <textarea name="doctor_remarks" class="form-control" rows="3" placeholder="Add prescription or diagnosis notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Approve & Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- SINGLE COMPLETE MODAL (OUTSIDE THE TABLE) -->
+<div class="modal fade" id="completeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="completeForm" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Complete Appointment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="status" value="completed">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Final Remarks</label>
+                        <textarea name="doctor_remarks" id="completeRemarks" class="form-control" rows="3" placeholder="Add final diagnosis or prescription..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Mark as Completed</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle Approve Button Clicks
+document.querySelectorAll('.approve-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const aptId = this.dataset.id;
+        const fee = this.dataset.fee;
+        
+        // Set form action
+        document.getElementById('approveForm').action = `/doctor/appointment/${aptId}/update`;
+        
+        // Set fee display
+        document.getElementById('feeDisplay').value = `Rs. ${fee}`;
+        
+        // Reset form fields
+        document.querySelector('#approveForm [name="discount"]').value = 0;
+        document.querySelector('#approveForm [name="doctor_remarks"]').value = '';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('approveModal'));
+        modal.show();
+    });
+});
+
+// Handle Complete Button Clicks
+document.querySelectorAll('.complete-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const aptId = this.dataset.id;
+        const remarks = this.dataset.remarks;
+        
+        // Set form action
+        document.getElementById('completeForm').action = `/doctor/appointment/${aptId}/update`;
+        
+        // Set existing remarks
+        document.getElementById('completeRemarks').value = remarks || '';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('completeModal'));
+        modal.show();
+    });
+});
+</script>
 @endsection

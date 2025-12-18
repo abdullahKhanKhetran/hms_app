@@ -5,7 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\PatientController;
-use App\Http\Controllers\QueueController; // <--- ADDED THIS IMPORT
+use App\Http\Controllers\QueueController;
 
 // Public Routes
 Route::get('/', function () { return view('welcome'); }); // Landing Page
@@ -30,13 +30,15 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 Route::middleware(['auth', 'role:doctor'])->group(function () {
     Route::get('/doctor/dashboard', [DoctorController::class, 'dashboard'])->name('doctor.dashboard');
     Route::post('/doctor/appointment/{id}/update', [DoctorController::class, 'updateStatus'])->name('doctor.update_status');
+    
+    // NEW: Preview and PDF routes
+    Route::get('/doctor/appointment/{id}/preview', [DoctorController::class, 'previewAppointment'])->name('doctor.preview_appointment');
+    Route::get('/doctor/appointment/{id}/download-pdf', [DoctorController::class, 'downloadAppointmentPdf'])->name('doctor.download_pdf');
 });
 
 // Patient Routes (Protected)
 Route::middleware(['auth', 'role:patient'])->group(function () {
-    // UNCOMMENTED AND FIXED:
     Route::get('/patient/dashboard', [PatientController::class, 'dashboard'])->name('patient.dashboard');
-    
     Route::get('/patient/book', [PatientController::class, 'showBookingForm'])->name('patient.book_form');
     Route::post('/patient/book', [PatientController::class, 'bookAppointment'])->name('patient.book_store');
     Route::get('/patient/appointment/{id}/pdf', [PatientController::class, 'downloadSlip'])->name('patient.download_pdf');
