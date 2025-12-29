@@ -44,6 +44,12 @@
                                     <a href="{{ route('patient.download_pdf', $apt->id) }}" class="btn btn-sm btn-outline-dark py-0" style="font-size: 0.8rem;">
                                         <i class="fas fa-download"></i> Slip
                                     </a>
+                                @elseif($apt->status == 'completed')
+                                    <span class="badge bg-secondary mb-1">Completed</span>
+                                    <br>
+                                    <a href="{{ route('patient.download_pdf', $apt->id) }}" class="btn btn-sm btn-outline-success py-0" style="font-size: 0.8rem;">
+                                        <i class="fas fa-file-medical"></i> Report
+                                    </a>
                                 @else
                                     <span class="badge bg-secondary mb-1">{{ ucfirst($apt->status) }}</span>
                                 @endif
@@ -58,7 +64,7 @@
     </div>
 </div>
 
-{{-- Doctor Availability Section (separate) --}}
+{{-- Doctor Availability Section --}}
 <div class="row mt-5">
     <div class="col-12">
         <div class="card shadow-sm">
@@ -82,16 +88,9 @@
                             <tbody>
                                 @foreach($doctors as $doctor)
                                     <tr>
-                                        {{-- Doctor Name --}}
                                         <td class="fw-bold">Dr. {{ $doctor->name }}</td>
-
-                                        {{-- Specialization --}}
                                         <td>{{ $doctor->doctorProfile->specialization ?? 'N/A' }}</td>
-
-                                        {{-- Fee --}}
                                         <td>Rs. {{ $doctor->doctorProfile->fee ?? 'N/A' }}</td>
-
-                                        {{-- Status --}}
                                         <td>
                                             @if($doctor->availability === 'free')
                                                 <span class="badge bg-success px-3 py-2">Free</span>
@@ -99,8 +98,6 @@
                                                 <span class="badge bg-danger px-3 py-2">Reserved</span>
                                             @endif
                                         </td>
-
-                                        {{-- Reserved Date --}}
                                         <td>
                                             @if($doctor->availability === 'reserved')
                                                 {{ \Carbon\Carbon::parse($doctor->reserved_date)->format('d M Y') }}

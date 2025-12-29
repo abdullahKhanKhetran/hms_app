@@ -1,32 +1,38 @@
 <?php
 
 namespace App\Http\Controllers;
+
+use App\Models\Appointment;
 use App\Models\QueueTicket;
 use Illuminate\Http\Request;
-use App\Models\Appointment;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class DoctorController extends Controller
 {
+    /**
+     * Doctor Dashboard
+     */
     public function dashboard()
     {
-        $appointments = Appointment::where('doctor_id', Auth::id())
-                        ->with('patient')
-                        ->where('appointment_date', '>=', now()->toDateString())
-                        ->orderBy('appointment_date', 'asc')
-                        ->get();
+        $appointments = Appointment::with('patient')
+            ->where('doctor_id', Auth::id())
+            ->whereDate('appointment_date', '>=', now()->toDateString())
+            ->orderBy('appointment_date')
+            ->get();
 
         return view('doctor.dashboard', compact('appointments'));
     }
-    
+
+    /**
+     * Update appointment status, discount & remarks
+     */
     public function updateStatus(Request $request, $id)
     {
-        $appointment = Appointment::findOrFail($id);
-        
-        if ($appointment->doctor_id != Auth::id()) {
-            abort(403);
-        }
+        $appointment = Appointment::with('doctor.doctorProfile')->findOrFail($id);
+        $this->authorizeDoctor($appointment);
 
         $request->validate([
             'status' => 'required|in:approved,cancelled,completed',
@@ -34,139 +40,145 @@ class DoctorController extends Controller
             'doctor_remarks' => 'nullable|string'
         ]);
 
-        if ($request->has('discount')) {
-            $appointment->discount = $request->discount;
-        }
-        
-        if ($request->has('doctor_remarks')) {
-            $appointment->doctor_remarks = $request->doctor_remarks;
-        }
+        $appointment->discount = $request->discount ?? $appointment->discount ?? 0;
+        $appointment->doctor_remarks = $request->doctor_remarks ?? $appointment->doctor_remarks;
 
-        if ($request->status == 'approved' && $appointment->status != 'approved') {
-            $fee = $appointment->doctor->doctorProfile->fee ?? 0;
-            $appointment->final_amount = $fee - $appointment->discount;
-            
-            $todayTokens = QueueTicket::whereHas('appointment', function($q) use ($appointment) {
-                $q->where('doctor_id', $appointment->doctor_id)
-                  ->where('appointment_date', $appointment->appointment_date);
-            })->count();
-
-            QueueTicket::create([
-                'appointment_id' => $appointment->id,
-                'token_number' => $todayTokens + 1,
-                'status' => 'waiting'
-            ]);
+        if ($request->status === 'approved' && $appointment->status !== 'approved') {
+            $this->approveAppointment($appointment);
         }
 
-        if ($request->status == 'completed') {
-            $ticket = QueueTicket::where('appointment_id', $appointment->id)->first();
-            if ($ticket) {
-                $ticket->update(['status' => 'done']);
-            }
-            
-            if (!$appointment->final_amount) {
-                $fee = $appointment->doctor->doctorProfile->fee ?? 0;
-                $appointment->final_amount = $fee - $appointment->discount;
-            }
+        if ($request->status === 'completed') {
+            $this->completeAppointment($appointment);
         }
 
         $appointment->status = $request->status;
         $appointment->save();
 
-        return back()->with('success', 'Status updated successfully!');
+        return back()->with('success', 'Appointment updated successfully!');
     }
-    
+
     /**
-     * Preview appointment and patient history (AJAX)
+     * Preview appointment & patient history (AJAX)
      */
     public function previewAppointment($id)
     {
         $appointment = Appointment::with(['patient', 'doctor.doctorProfile', 'queueTicket'])
             ->findOrFail($id);
-        
-        // Check authorization
-        if ($appointment->doctor_id != Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-        
-        // Get patient's previous appointments with this doctor
-        $previousAppointments = Appointment::where('patient_id', $appointment->patient_id)
-            ->where('doctor_id', Auth::id())
-            ->where('id', '!=', $id)
-            ->where('status', 'completed')
-            ->with('doctor.doctorProfile')
-            ->orderBy('appointment_date', 'desc')
-            ->take(10)
-            ->get();
-        
-        // Format current appointment data
-        $currentData = [
-            'patient_name' => $appointment->patient->name,
-            'date' => \Carbon\Carbon::parse($appointment->appointment_date)->format('d M Y'),
-            'status_badge' => $this->getStatusBadge($appointment->status),
-            'fee' => number_format($appointment->doctor->doctorProfile->fee ?? 0, 2),
-            'discount' => number_format($appointment->discount ?? 0, 2),
-            'final_amount' => number_format($appointment->final_amount ?? 
-                (($appointment->doctor->doctorProfile->fee ?? 0) - ($appointment->discount ?? 0)), 2),
-            'remarks' => $appointment->doctor_remarks
-        ];
-        
-        // Format history data
-        $historyData = $previousAppointments->map(function($apt) {
-            return [
-                'date' => \Carbon\Carbon::parse($apt->appointment_date)->format('d M Y'),
-                'doctor' => 'Dr. ' . $apt->doctor->name,
-                'department' => $apt->doctor->doctorProfile->specialization ?? 'N/A',
-                'remarks' => \Illuminate\Support\Str::limit($apt->doctor_remarks ?? '', 100)
-            ];
-        });
-        
+
+        $this->authorizeDoctor($appointment);
+
+        $history = $this->getPatientHistory($appointment, 10);
+
+        $fee = $appointment->doctor->doctorProfile->fee ?? 0;
+        $discount = $appointment->discount ?? 0;
+
         return response()->json([
-            'current' => $currentData,
-            'history' => $historyData
+            'current' => [
+                'patient_name' => $appointment->patient->name,
+                'date' => Carbon::parse($appointment->appointment_date)->format('d M Y'),
+                'status_badge' => $this->getStatusBadge($appointment->status),
+                'fee' => number_format($fee, 2),
+                'discount' => number_format($discount, 2),
+                'final_amount' => number_format(
+                    $appointment->final_amount ?? ($fee - $discount),
+                    2
+                ),
+                'remarks' => $appointment->doctor_remarks,
+                'token' => optional($appointment->queueTicket)->token_number
+            ],
+            'history' => $history->map(fn ($apt) => [
+                'date' => Carbon::parse($apt->appointment_date)->format('d M Y'),
+                'remarks' => Str::limit($apt->doctor_remarks ?? '', 100),
+                'fee' => $apt->doctor->doctorProfile->fee ?? 0,
+                'discount' => $apt->discount ?? 0,
+                'final_amount' => $apt->final_amount ?? 0,
+            ])
         ]);
     }
-    
+
     /**
-     * Download PDF for appointment
+     * Download PATIENT HISTORY PDF (NOT appointment slip)
      */
     public function downloadAppointmentPdf($id)
     {
-        $appointment = Appointment::with(['patient', 'doctor.doctorProfile', 'queueTicket'])
+        $appointment = Appointment::with(['patient', 'doctor.doctorProfile'])
             ->findOrFail($id);
-        
-        // Check authorization
-        if ($appointment->doctor_id != Auth::id()) {
-            abort(403);
-        }
-        
-        // Get patient's previous appointments
-        $previousAppointments = Appointment::where('patient_id', $appointment->patient_id)
-            ->where('doctor_id', Auth::id())
-            ->where('id', '!=', $id)
-            ->where('status', 'completed')
-            ->with('doctor.doctorProfile')
-            ->orderBy('appointment_date', 'desc')
-            ->take(10)
-            ->get();
-        
-        $pdf = Pdf::loadView('pdf.doctor_slip', compact('appointment', 'previousAppointments'));
-        
-        return $pdf->download('patient-history-' . $appointment->patient->name . '-' . $id . '.pdf');
+
+        $this->authorizeDoctor($appointment);
+
+        $previousAppointments = $this->getPatientHistory($appointment, 50);
+
+        return Pdf::loadView(
+            'pdf.patient_history',
+            compact('appointment', 'previousAppointments')
+        )->download(
+            'patient-history-' .
+            Str::slug($appointment->patient->name) .
+            '.pdf'
+        );
     }
-    
+
+    /* =========================
+       Helper Methods
+       ========================= */
+
+    private function authorizeDoctor(Appointment $appointment)
+    {
+        if ($appointment->doctor_id !== Auth::id()) {
+            abort(403, 'Unauthorized access');
+        }
+    }
+
+    private function approveAppointment(Appointment $appointment)
+    {
+        $fee = $appointment->doctor->doctorProfile->fee ?? 0;
+        $appointment->final_amount = $fee - ($appointment->discount ?? 0);
+
+        $todayTokens = QueueTicket::whereHas('appointment', function ($q) use ($appointment) {
+            $q->where('doctor_id', $appointment->doctor_id)
+              ->whereDate('appointment_date', $appointment->appointment_date);
+        })->count();
+
+        QueueTicket::firstOrCreate(
+            ['appointment_id' => $appointment->id],
+            [
+                'token_number' => $todayTokens + 1,
+                'status' => 'waiting'
+            ]
+        );
+    }
+
+    private function completeAppointment(Appointment $appointment)
+    {
+        QueueTicket::where('appointment_id', $appointment->id)
+            ->update(['status' => 'done']);
+
+        if (!$appointment->final_amount) {
+            $fee = $appointment->doctor->doctorProfile->fee ?? 0;
+            $appointment->final_amount = $fee - ($appointment->discount ?? 0);
+        }
+    }
+
     /**
-     * Helper to generate status badge HTML
+     * FIXED: Patient history now shows correctly
      */
+private function getPatientHistory(Appointment $appointment, $limit = 50)
+{
+    return Appointment::with('doctor.doctorProfile')
+        ->where('patient_id', $appointment->patient_id)
+        ->orderByDesc('appointment_date')
+        ->take($limit)
+        ->get();
+}
+
+
     private function getStatusBadge($status)
     {
-        $badges = [
-            'pending' => '<span class="badge bg-warning text-dark">Pending</span>',
-            'approved' => '<span class="badge bg-success">Approved</span>',
+        return [
+            'pending'   => '<span class="badge bg-warning text-dark">Pending</span>',
+            'approved'  => '<span class="badge bg-success">Approved</span>',
             'completed' => '<span class="badge bg-secondary">Completed</span>',
             'cancelled' => '<span class="badge bg-danger">Cancelled</span>',
-        ];
-        
-        return $badges[$status] ?? '<span class="badge bg-secondary">' . ucfirst($status) . '</span>';
+        ][$status] ?? '<span class="badge bg-dark">' . ucfirst($status) . '</span>';
     }
 }
